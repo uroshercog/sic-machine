@@ -64,6 +64,7 @@ func (cpu *CPU) GetRegisters() []string {
 }
 
 func (cpu *CPU) SetStart(start int32) {
+	cpu.ram.ValidAddress(start)
 	cpu.registers[regPC].Set(start)
 }
 
