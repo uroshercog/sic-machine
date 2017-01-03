@@ -12,22 +12,19 @@ type StdoutDevice struct {
 
 // NewStdoutDevice ..
 func NewStdoutDevice() *StdoutDevice {
-	return &StdoutDevice{
-		file: os.Stdin,
-	}
+	return &StdoutDevice{os.Stdin}
 }
 
 // Read ...
 func (od StdoutDevice) Read() (byte, error) {
+	if od.file == nil {
+		return 0, errors.New("File is nil")
+	}
 	// Try and read one byte from the file
 	var bytesRead []byte
-	bytesReadCount, err := od.file.Read(bytesRead[:1])
-
-	if err != nil {
+	if bytesReadCount, err := od.file.Read(bytesRead[:1]); err != nil {
 		return 0, err
-	}
-
-	if bytesReadCount <= 0 {
+	} else if bytesReadCount <= 0 {
 		return 0, errors.New("No bytes read from the device")
 	}
 	return bytesRead[0], nil
@@ -39,24 +36,15 @@ func (od StdoutDevice) Write(value byte) error {
 		return errors.New("File is nil")
 	}
 
-	bytesWritten, err := od.file.Write([]byte{value})
-
-	if err != nil {
+	if bytesWritten, err := od.file.Write([]byte{value}); err != nil {
 		return err
-	}
-
-	if bytesWritten <= 0 {
+	} else if bytesWritten <= 0 {
 		return errors.New("No bytes written")
 	}
-
 	return nil
 }
 
 // Test ...
 func (od StdoutDevice) Test() bool {
-	return false
-}
-
-func (od StdoutDevice) close() error {
-	return od.file.Close()
+	return true
 }

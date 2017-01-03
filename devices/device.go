@@ -8,5 +8,4 @@ type Device interface {
 	Read() (byte, error)
 	// Write ...
 	Write(value byte) error
-	close() error
 }
