@@ -1,0 +1,6 @@
+hash: d742efabe5c131ab1b9008a0fecb9559de3658fac4ae22348bebef8366488941
+updated: 2016-12-31T16:44:48.751729966+01:00
+imports:
+- name: github.com/gizak/termui
+  version: bfde399a8caee62789593f2cbbda70feee4d5553
+testImports: []

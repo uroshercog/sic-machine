@@ -1,0 +1,4 @@
+package: github.com/uroshercog/sic-machine
+import:
+- package: github.com/gizak/termui
+  version: v2.1.1
