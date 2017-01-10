@@ -42,12 +42,12 @@ func (reg *IntRegister) Divide(value int32) {
 
 // ShiftLeft ...
 func (reg *IntRegister) ShiftLeft(bitCount uint32) {
-	// TODO: Circular shift left
+	reg.value <<= bitCount
 }
 
 // ShiftRight ...
 func (reg *IntRegister) ShiftRight(bitCount uint32) {
-	// TODO: Circular shift right
+	reg.value >>= bitCount
 }
 
 // And ...

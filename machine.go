@@ -9,14 +9,15 @@ import (
 	"bufio"
 	"github.com/uroshercog/sic-machine/processor"
 	"github.com/uroshercog/sic-machine/ui"
+	"fmt"
 )
 
 func main() {
-	//defer func() {
-	//	if r := recover(); r != nil {
-	//		fmt.Fprintf(os.Stderr, "Exception: %v\n", r)
-	//	}
-	//}()
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "Exception: %v\n", r)
+		}
+	}()
 
 	/* 1. Preberi ime datoteke iz command line argumentov */
 
@@ -43,6 +44,7 @@ func main() {
 		uix.RenderExecutingCommand(cmd)
 		uix.RenderRegistersWidget(CPU.GetRegisters())
 		uix.RenderRAMWidget(RAM.GetRaw())
+		uix.RenderScreenWidget(RAM.GetRaw())
 	})
 
 	uix.Handle(ui.PAUSE, CPU.Stop)

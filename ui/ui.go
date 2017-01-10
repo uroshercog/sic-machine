@@ -41,6 +41,7 @@ func (ui *UI) Run(ram []byte, registers []string) {
 	ui.RenderStatusWidget("initialized")
 	ui.RenderInstructionsWidget()
 	ui.RenderRAMWidget(ram)
+	ui.RenderScreenWidget(ram)
 	ui.RenderExecutingCommand("")
 
 	termui.Loop()
@@ -84,6 +85,40 @@ func (ui *UI) RenderRAMWidget(ram []byte) {
 
 	termui.Render(ls)
 }
+func (ui *UI) RenderScreenWidget(ram []byte) {
+	ls := termui.NewList()
+
+	gram := ram[0xB800:]
+
+	rowCount := int(len(gram) / 70) + 1
+	rows := make([]string, rowCount, rowCount)
+
+	// Draw rows
+	for i := 0; i < rowCount; i++ {
+		// Draw cols
+		colsCount := len(gram) - i*70
+		if colsCount > 70 {
+			colsCount = 70
+		}
+
+		cols := make([]string, colsCount, colsCount)
+		for j := 1; j < colsCount; j++ {
+			cols[j] = fmt.Sprintf("%c", gram[i*70 + j - 1])
+		}
+		rows[i] = strings.Join(cols[:], "")
+	}
+
+	ls.Items = rows[:]
+	ls.ItemFgColor = termui.ColorYellow
+	ls.BorderLabel = "Screen"
+	ls.Height = 20
+	ls.Width = 72
+	ls.Y = 0
+	ls.X = 88
+
+	termui.Render(ls)
+}
+
 func (ui *UI) RenderStatusWidget(status string) {
 	st := termui.NewPar(status)
 	st.Height = 3

@@ -22,7 +22,7 @@ func (id *StdinDevice) Read() (byte, error) {
 		return 0, errors.New("File is nil")
 	}
 
-	var bytesRead []byte
+	bytesRead := make([]byte, 1)
 	if bytesReadCount, err := id.file.Read(bytesRead[:1]); err != nil {
 		return 0, err
 	} else if bytesReadCount <= 0 {

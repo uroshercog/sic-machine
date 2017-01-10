@@ -14,8 +14,8 @@ type FileDevice struct {
 // NewFileDevice ..
 func NewFileDevice(device byte) *FileDevice {
 	if file, err := os.OpenFile(fmt.Sprintf("%#02x.dev", device),
-		os.O_RDWR|os.O_CREATE|os.O_TRUNC,
-		os.ModeExclusive|os.ModeDevice); err != nil {
+		os.O_RDWR|os.O_CREATE|os.O_APPEND,
+		os.ModePerm); err != nil {
 		panic(err)
 	} else {
 		return &FileDevice{file}
@@ -25,7 +25,7 @@ func NewFileDevice(device byte) *FileDevice {
 // Read a single byte from the file device
 func (fd *FileDevice) Read() (byte, error) {
 	// Try and read one byte from the file
-	var bytesRead []byte
+	bytesRead := make([]byte, 1)
 	if bytesReadCount, err := fd.file.Read(bytesRead[:1]); err != nil {
 		return 0, err
 	} else if bytesReadCount <= 0 {
@@ -41,7 +41,7 @@ func (fd *FileDevice) Write(value byte) error {
 		return errors.New("File is nil")
 	}
 
-	if bytesWritten, err := fd.file.Write([]byte{}); err != nil {
+	if bytesWritten, err := fd.file.Write([]byte{value}); err != nil {
 		return err
 	} else if bytesWritten <= 0 {
 		return errors.New("No bytes written to the device")

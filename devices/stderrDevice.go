@@ -21,7 +21,7 @@ func (se StderrDevice) Read() (byte, error) {
 		return 0, errors.New("File is nil")
 	}
 	// Try and read one byte from the file
-	var bytesRead []byte
+	bytesRead := make([]byte, 1)
 	if bytesReadCount, err := se.file.Read(bytesRead[:1]); err != nil {
 		return 0, err
 	} else if bytesReadCount <= 0 {

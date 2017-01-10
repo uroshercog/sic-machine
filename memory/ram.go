@@ -7,7 +7,7 @@ import (
 )
 
 // MaxAddress ...
-const MaxAddress = 1000 // bytes
+const MaxAddress = 0xF000 // bytes
 
 const (
 	errInvalidMemoryAddress = "Invalid memory address"
@@ -33,19 +33,14 @@ func (ram *RAM) SetByte(addr int32, value byte) (err error) {
 
 // GetWord ...
 func (ram *RAM) GetWord(addr int32) (ret int32) {
-	ram.ValidAddress(addr)
-	//fmt.Printf("* Loading from %#x\n", addr)
+	ram.ValidAddress(addr + 2)
+
 	val := ram.GetByte(addr)
-	//fmt.Printf("\t* Loaded %#x\n", val)
 	ret = int32(val)
-	//fmt.Printf("* Loading from %#x\n", addr+1)
 	val = ram.GetByte(addr + 1)
-	//fmt.Printf("\t* Loaded %#x\n", val)
-	ret = (ret << 3) + int32(val)
-	//fmt.Printf("* Loading from %#x\n", addr+2)
+	ret = (ret << 8) + int32(val)
 	val = ram.GetByte(addr + 2)
-	//fmt.Printf("\t* Loaded %#x\n", val)
-	ret = (ret << 3) + int32(val)
+	ret = (ret << 8) + int32(val)
 	return
 }
 
@@ -80,7 +75,5 @@ func (ram *RAM) GetRaw() []byte {
 
 // New ...
 func New() *RAM {
-	return &RAM{
-		cells: make([]byte, MaxAddress),
-	}
+	return &RAM{make([]byte, MaxAddress)}
 }

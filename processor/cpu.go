@@ -7,6 +7,8 @@ import (
 	reg "github.com/uroshercog/sic-machine/processor/registers"
 	"time"
 	"fmt"
+	"errors"
+	"sync"
 )
 
 const (
@@ -38,11 +40,12 @@ var (
 
 // CPU ...
 type CPU struct {
+	mx        sync.Mutex
 	registers [9]reg.Register
 	ram       *memory.RAM
 	devices   *dev.DeviceManager
 	clock     *time.Ticker
-	speed     int64 // OP/s
+	speed     int64
 	running   bool
 	OnStart   []func()
 	OnStop    []func()
@@ -70,40 +73,33 @@ func (cpu *CPU) SetStart(start int32) {
 
 // Run ...
 func (cpu *CPU) run() byte {
-	// Sets the PC register and starts executing the commands
-	cpu.running = true
-	defer func() {
-		cpu.running = false
-	}()
-
 	pcReg := cpu.registers[regPC]
 
 	var command, operand byte
 
 	// Load the first byte from the memory (from location in PC)
 	command = cpu.ram.GetByte(pcReg.Get())
-	// Increment the program counter by the number of bytes used in the instruction
 	pcReg.Add(0x1)
 	// Command is 8 bits
 	if executed := cpu.executeF1(command); executed {
 		// The command was format 1
+		// Increment the program counter by the number of bytes used in the instruction
 		return command
 	}
 
 	// Load another byte
 	operand = cpu.ram.GetByte(pcReg.Get())
-	// Increment the program counter by the number of bytes used in the instruction
 	pcReg.Add(0x1)
 
 	// Check if the two bytes represent a command and an operand
 	if executed := cpu.executeF2(command, int32(operand)); executed {
 		// The command was format 2
+		// Increment the program counter by the number of bytes used in the instruction
 		return command
 	}
 
 	// Load a third byte
 	operandEx := (int32(operand) << 8) | int32(cpu.ram.GetByte(pcReg.Get()))
-	// Increment the PC register by the number of bytes used in the instruction
 	pcReg.Add(0x1)
 
 	// Parse the bits in the command and the operand
@@ -132,10 +128,10 @@ func (cpu *CPU) run() byte {
 
 		// Load the 4th byte
 		operandEx = (operandEx << 8) | int32(cpu.ram.GetByte(pcReg.Get()))
+		pcReg.Add(0x1)
 		// Format 4 operand is bottom 20 bits
 		operandEx &= 0xFFFFF
 		// Increment the PC counter by one because we loaded an additional byte as part of the operand value
-		pcReg.Add(0x1)
 
 		if executed := cpu.execute(command, operandEx, bits); executed {
 			return command
@@ -155,16 +151,16 @@ func (cpu *CPU) run() byte {
 			operandEx += cpu.registers[regB].Get()
 		} else if bits["p"] && bits["b"] {
 			// It cannot be PC and base relative at the same time
-			panic("Invalid addressing")
+			panic("Invalid addressing: PC and base")
 		}
 	}
 
 	if bits["x"] {
 		// Check if its indexed addressing
-		if bits["n"] && bits["i"] {
+		if bits["n"] && bits["i"] || !bits["n"] && !bits["i"] {
 			operandEx += cpu.registers[regX].Get()
 		} else {
-			panic("Invalid addressing")
+			panic("Invalid addressing: indexed")
 		}
 	}
 
@@ -182,6 +178,7 @@ func (cpu *CPU) run() byte {
 // Starts the CPU clock
 func (cpu *CPU) Start() {
 	if !cpu.running {
+		cpu.running = true
 		// Create a new ticker
 		cpu.clock = time.NewTicker(time.Duration(nanoseconds / cpu.speed))
 
@@ -203,6 +200,7 @@ func (cpu *CPU) Start() {
 // Pauses the cpu clock, for breakpoints or w/e
 func (cpu *CPU) Stop() {
 	if cpu.running {
+		cpu.running = false
 		cpu.clock.Stop()
 		for _, f := range cpu.OnStop {
 			f()
@@ -210,6 +208,7 @@ func (cpu *CPU) Stop() {
 	}
 }
 
+// Step ...
 func (cpu *CPU) Step() {
 	if !cpu.running {
 		cmd := cpu.run()
@@ -217,6 +216,21 @@ func (cpu *CPU) Step() {
 			f(cmdMap[cmd >> 2])
 		}
 	}
+}
+
+// SetSpeed ...
+func (cpu *CPU) SetSpeed(speed int64) error {
+	if speed < 0 {
+		return errors.New("Speed must be positive")
+	}
+
+	cpu.speed = speed
+	return nil
+}
+
+// IsRunning ...
+func (cpu *CPU) IsRunning() bool {
+	return cpu.running
 }
 
 func (cpu *CPU) executeF1(command byte) bool {
@@ -258,21 +272,11 @@ func (cpu *CPU) executeF2(command byte, operand int32) bool {
 		// Load one more byte, upper 4 bits are R1 and lower 4 bits are R2
 		cpu.registers[v2].Add(cpu.registers[v1].Get())
 	case oc.CLEAR:
-		cpu.registers[v2].Clear()
+		cpu.registers[v1].Clear()
 	case oc.COMPR:
-		// Load one more byte, upper 4 bits are R1 and lower 4 bits are R2
-		r1 := cpu.registers[v1].Get()
-		r2 := cpu.registers[v2].Get()
-
-		rSW := cpu.registers[regSW]
-
-		if r1 < r2 {
-			rSW.Set(0x2)
-		} else if r1 > r2 {
-			rSW.Set(0x1)
-		} else {
-			rSW.Set(0x0)
-		}
+		// Load one more byte, upper 4 bits are R1 and lower 4 bits
+		sw := cpu.registers[regSW].(*reg.SwRegister)
+		sw.Compare(cpu.registers[v1].Get(), cpu.registers[v2].Get())
 	case oc.DIVR:
 		//R2 <- (R2) + (R1)
 		// Load one more byte, upper 4 bits are R1 and lower 4 bits are R2
@@ -280,7 +284,7 @@ func (cpu *CPU) executeF2(command byte, operand int32) bool {
 	case oc.MULR:
 		//R2 <- (R2) * (R1)
 		// Load one more byte, upper 4 bits are R1 and lower 4 bits are R2
-		cpu.registers[v2].Add(cpu.registers[v1].Get())
+		cpu.registers[v2].Multiply(cpu.registers[v1].Get())
 	case oc.RMO:
 		//R2 <- (R1)
 		// Load one more byte, upper 4 bits are R1 and lower 4 bits are R2
@@ -411,7 +415,7 @@ func (cpu *CPU) execute(command byte, operand int32, flags map[string]bool) bool
 		if flags["n"] && !flags["i"] {
 			operand = cpu.ram.GetWord(operand)
 		}
-		cpu.ram.SetByte(operand, byte(cpu.registers[regB].Get()))
+		cpu.ram.SetByte(operand, byte(cpu.registers[regA].Get()))
 	case oc.STF:
 		panic("Not implemented")
 	case oc.STI:
@@ -450,7 +454,8 @@ func (cpu *CPU) execute(command byte, operand int32, flags map[string]bool) bool
 	case oc.TD:
 		panic("Not implemented")
 	case oc.TIX:
-		panic("Not implemented")
+		cpu.registers[regX].Add(0x1)
+		cpu.registers[regSW].(*reg.SwRegister).Compare(cpu.registers[regX].Get(), cpu.resolveWordOperand(operand, flags))
 	case oc.WD:
 		cpu.devices.Get(cpu.resolveByteOperand(operand, flags)).Write(byte(cpu.registers[regA].Get()))
 	default:
@@ -500,16 +505,16 @@ func NewCPU(ram *memory.RAM, devices *dev.DeviceManager) *CPU {
 		&reg.SwRegister{},
 	}
 
-	ops := int64(1000)
-
-	return &CPU{
+	ret := &CPU{
 		registers: registers,
 		ram:       ram,
 		devices:   devices,
-		clock:     time.NewTicker(time.Duration(nanoseconds / ops)),
-		speed:     ops,
+		clock:     nil,
 		OnStart:   []func(){},
 		OnStop:    []func(){},
 		OnExec:    []func(cmd string){},
 	}
+
+	ret.SetSpeed(10000) // Number of operations/s
+	return ret
 }

@@ -97,7 +97,7 @@ func (obj *ObjectCode) loadBody(str []byte) {
 
 	for i := int32(0); i < 2*body.Length; i += 2 {
 		b, _ := hex.DecodeString(string(str[9 + i:9 + i + 2]))
-		// Lets just ignore the error
+		// Lets just ignore the error :)
 		body.Code = append(body.Code, b[0])
 	}
 
